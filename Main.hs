@@ -8,7 +8,7 @@ import System.Directory (doesDirectoryExist, doesFileExist, listDirectory)
 import System.Environment (getArgs, getProgName)
 import System.Exit (die)
 
-type DoupMap = HM.Map ByteString [FilePath]
+type DupMap = HM.Map ByteString [FilePath]
 
 merge :: [[a]] -> [a]
 merge = merge' []
@@ -24,25 +24,25 @@ main = do
   args <- getArgs
   name <- getProgName
   if not (null args)
-  then findDouplicates args
+  then findDuplicates args
   else die $ "Not enougth input arguments.\n\
              \Usage: " ++ name ++ " path [paths]\n\
              \Matching files are seperated by a tab character \"\\t\" \
              \and matches are seperated by a newline \"\\n\".\n"
 
-findDouplicates :: [FilePath] -> IO ()
-findDouplicates paths = do
+findDuplicates :: [FilePath] -> IO ()
+findDuplicates paths = do
   entrys <- mapM reqList paths
   -- mapM_ putStrLn entrys
   hashes <- mapM (\p -> LBS.readFile p >>= (\bs -> return (hashlazy bs, p))) $ merge entrys
   -- mapM_ (\(h, p) -> putStr (Char8.unpack $ B.toLazyByteString $ B.byteStringHex h) >> putStr " : " >> putStrLn p) hashes
-  let doups = filterDouplicates hashes
+  let doups = filterDuplicates hashes
   mapM_ (\(_, ps) -> mapM_ (\p -> putStr p >> putStr "\t") ps >> putStr "\n") $ HM.toList doups
 
-filterDouplicates :: [(ByteString, FilePath)] -> DoupMap
-filterDouplicates = fd HM.empty
+filterDuplicates :: [(ByteString, FilePath)] -> DupMap
+filterDuplicates = fd HM.empty
 
-fd :: DoupMap -> [(ByteString, FilePath)] -> DoupMap
+fd :: DupMap -> [(ByteString, FilePath)] -> DupMap
 fd hMap [] = HM.filter (\ps -> length ps > 1) hMap
 fd hMap ((bs, p) : rest)
   | HM.member bs hMap = fd hMap' rest

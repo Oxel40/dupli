@@ -93,7 +93,7 @@ findDuplicates paths = do
   -- feed workers
   let allPaths = concat entrys
   mapM_ (atomically . writeTChan pathChan . Just) allPaths
-  mapM_ (atomically . writeTChan pathChan . const Nothing) [1..(nWorkers*2)]
+  mapM_ (atomically . writeTChan pathChan . const Nothing) [1..nWorkers]
   -- await threads
   debugPutStrLn "Awaiting threads..."
   awaitThreads threads

@@ -22,8 +22,9 @@ executable dupli
                        directory,
                        cryptohash-sha1,
                        bytestring,
-                       hashmap
+                       hashmap,
+					   stm
   -- hs-source-dirs:
   default-language:    Haskell2010
-  ghc-options:         -O2 -Wall -threaded +RTS -N4 -RTS
+  ghc-options:         -O2 -Wall -threaded +RTS -N -RTS
   -- ghc-options:         -prof -fprof-auto -rtsopts

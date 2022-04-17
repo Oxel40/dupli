@@ -1,14 +1,15 @@
 module Main where
 
-import Crypto.Hash.SHA1 (hashlazy)
-import Data.ByteString (ByteString)
-import qualified Data.ByteString.Lazy as LBS
+import Crypto.Hash.SHA1 (hash)
+-- import Data.ByteString (ByteString, readFile)
+import qualified Data.ByteString as BS (ByteString, readFile)
+-- import qualified Data.ByteString.Lazy as LBS
 import qualified Data.HashMap as HM
 import System.Directory (doesDirectoryExist, doesFileExist, listDirectory)
 import System.Environment (getArgs, getProgName)
 import System.Exit (die)
 
-type DupMap = HM.Map ByteString [FilePath]
+type DupMap = HM.Map BS.ByteString [FilePath]
 
 merge :: [[a]] -> [a]
 merge = merge' []
@@ -34,15 +35,15 @@ findDuplicates :: [FilePath] -> IO ()
 findDuplicates paths = do
   entrys <- mapM reqList paths
   -- mapM_ putStrLn entrys
-  hashes <- mapM (\p -> LBS.readFile p >>= (\bs -> return (hashlazy bs, p))) $ merge entrys
+  hashes <- mapM (\p -> BS.readFile p >>= (\bs -> return (hash bs, p))) $ merge entrys
   -- mapM_ (\(h, p) -> putStr (Char8.unpack $ B.toLazyByteString $ B.byteStringHex h) >> putStr " : " >> putStrLn p) hashes
   let doups = filterDuplicates hashes
   mapM_ (\(_, ps) -> mapM_ (\p -> putStr p >> putStr "\t") ps >> putStr "\n") $ HM.toList doups
 
-filterDuplicates :: [(ByteString, FilePath)] -> DupMap
+filterDuplicates :: [(BS.ByteString, FilePath)] -> DupMap
 filterDuplicates = fd HM.empty
 
-fd :: DupMap -> [(ByteString, FilePath)] -> DupMap
+fd :: DupMap -> [(BS.ByteString, FilePath)] -> DupMap
 fd hMap [] = HM.filter (\ps -> length ps > 1) hMap
 fd hMap ((bs, p) : rest)
   | HM.member bs hMap = fd hMap' rest

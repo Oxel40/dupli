@@ -20,19 +20,13 @@ nWorkers = 4
 debug :: Bool
 debug = True
 
+debugPutStrLn :: String -> IO ()
+debugPutStrLn = when debug . hPutStrLn stderr
+
 type DupMap = HM.Map ByteString [FilePath]
-
-merge :: [[a]] -> [a]
-merge = merge' []
-
-merge' :: [a] -> [[a]] -> [a]
-merge' [] [] = []
-merge' [] (b:bs) = merge' b bs
-merge' (x:xs) bs = x : merge' xs bs
 
 main :: IO ()
 main = do
-  -- putStrLn "Hello, Haskell!"
   args <- getArgs
   name <- getProgName
   if not (null args)
@@ -62,31 +56,25 @@ awaitThreads = mapM_ takeMVar
 hashWorker :: TChan (Maybe FilePath) -> TChan (ByteString, FilePath) -> IO ()
 hashWorker pathChan hashChan = do
   tId <- myThreadId
-  when debug $ putStrLn $ show tId ++ ": Started"
+  debugPutStrLn $ show tId ++ ": Started"
   hw pathChan hashChan
 
 hw :: TChan (Maybe FilePath) -> TChan (ByteString, FilePath) -> IO ()
 hw pathChan hashChan = do
-  -- threadDelay 1000000 -- 1 sec
   tId <- myThreadId
   mby <- atomically $ readTChan pathChan
 
   case mby of
-    Nothing -> when debug $ putStrLn $ show tId ++ ": Nothing in channel"
+    Nothing -> debugPutStrLn $ show tId ++ ": Nothing in channel"
     Just path -> do
-      -- when debug $ putStrLn $ show tId ++ ": Just in channel"
+      -- debugPutStrLn $ show tId ++ ": Just in channel"
       withFile path ReadMode $ \file -> do
-        -- fileContent <- LBS.readFile path 
         fileContent <- LBS.hGetContents file
         let fileHash = hashlazy fileContent 
         let out = fileHash `seq` (fileHash, path)
         atomically $ writeTChan hashChan $! out
-      -- when debug $ putStrLn $ show tId ++ ": Wrote to channel"
+      -- debugPutStrLn $ show tId ++ ": Wrote to channel"
       hw pathChan hashChan
-
-  -- threadDelay 1000000 -- 1 sec
-      -- hashWorker pathChan hashChan
--- hashes <- mapM (\p -> LBS.readFile p >>= (\bs -> return (hashlazy bs, p))) $ merge entrys
 
 findDuplicates :: [FilePath] -> IO ()
 findDuplicates paths = do
@@ -103,53 +91,30 @@ findDuplicates paths = do
   -- start threads
   threads <- forkThreads nWorkers worker
   -- feed workers
-  print $ length $ merge entrys
-  -- let allPaths = take 1014 $ merge entrys
-  let allPaths = merge entrys
-  threadDelay 3000000
+  let allPaths = concat entrys
   mapM_ (atomically . writeTChan pathChan . Just) allPaths
   mapM_ (atomically . writeTChan pathChan . const Nothing) [1..(nWorkers*2)]
-  threadDelay 3000000
   -- await threads
-  when debug $ putStrLn "Awaiting threads..."
+  debugPutStrLn "Awaiting threads..."
   awaitThreads threads
-  when debug $ putStrLn "Awaiting threads... Done"
-  -- hashes <- getChanContents hashChan
-  when debug $ putStrLn "Reading from chan..."
-  -- _ <- atomically $ readTChan hashChan 
-  {-
-  i <- newMVar 1 :: IO (MVar Int)
-  _ <- forever $ do
-    im <- takeMVar i
-    mb <- atomically $ tryReadTChan hashChan
-    case mb of
-      Nothing -> do
-        when debug $ putStrLn $ show im ++ " Nothing in channel"
-        _ <- atomically $ readTChan hashChan
-        return ()
-      Just _ -> return ()
-    -- when debug $ putStrLn $ show im ++ " Single read from chan done"
-    putMVar i (im+1)
-  -}
+  debugPutStrLn "Awaiting threads... Done"
 
+  debugPutStrLn "Reading from chan..."
   hashes <- mapM (\_ -> atomically $ readTChan hashChan) allPaths
-  when debug $ putStrLn "Reading from chan... Done"
+  debugPutStrLn "Reading from chan... Done"
 
   ----------
   time2 <- getCPUTime
   let doups = filterDuplicates hashes
+  mapM_ (\(_, ps) -> mapM_ (\p -> putStr p >> putStr "\t") ps >> putStr "\n") $ HM.toList doups
   ----------
   time3 <- getCPUTime
-  mapM_ (\(_, ps) -> mapM_ (\p -> putStr p >> putStr "\t") ps >> putStr "\n") $ HM.toList doups
 
-  when debug $ print $ length hashes
+  debugPutStrLn $ "No. Files: " ++ show (length hashes)
 
-  putStr "Finding entries: "
-  print $ (time1 - time0)*100 `div` (time3 - time0)
-  putStr "Reading files and generating hashes: "
-  print $ (time2 - time1)*100 `div` (time3 - time0)
-  putStr "Filtering doup hashes: "
-  print $ (time3 - time2)*100 `div` (time3 - time0)
+  debugPutStrLn $ "Finding entries: " ++ show ((time1 - time0)*100 `div` (time3 - time0))
+  debugPutStrLn $ "Reading files and generating hashes: " ++ show ((time2 - time1)*100 `div` (time3 - time0))
+  debugPutStrLn $ "Filtering doup hashes: " ++ show ((time3 - time2)*100 `div` (time3 - time0))
 
 filterDuplicates :: [(ByteString, FilePath)] -> DupMap
 filterDuplicates = fd HM.empty
@@ -175,4 +140,6 @@ reqList path = do
     else
       if isFile
         then return [path]
-        else die $ "Error: " ++ path ++ " is not a file or directory."
+        else do
+          hPutStrLn stderr $ "Warning: " ++ path ++ " is not a file or directory."
+          return []

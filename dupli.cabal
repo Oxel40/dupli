@@ -26,3 +26,4 @@ executable dupli
   -- hs-source-dirs:
   default-language:    Haskell2010
   ghc-options:         -O2 -Wall -threaded +RTS -N4 -RTS
+  -- ghc-options:         -prof -fprof-auto -rtsopts

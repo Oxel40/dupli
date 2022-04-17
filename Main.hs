@@ -5,6 +5,7 @@ import Crypto.Hash.SHA1 (hash)
 import qualified Data.ByteString as BS (ByteString, readFile)
 -- import qualified Data.ByteString.Lazy as LBS
 import qualified Data.HashMap as HM
+import System.CPUTime (getCPUTime)
 import System.Directory (doesDirectoryExist, doesFileExist, listDirectory)
 import System.Environment (getArgs, getProgName)
 import System.Exit (die)
@@ -33,12 +34,23 @@ main = do
 
 findDuplicates :: [FilePath] -> IO ()
 findDuplicates paths = do
+  time0 <- getCPUTime
   entrys <- mapM reqList paths
+  time1 <- getCPUTime
   -- mapM_ putStrLn entrys
   hashes <- mapM (\p -> BS.readFile p >>= (\bs -> return (hash bs, p))) $ merge entrys
+  time2 <- getCPUTime
   -- mapM_ (\(h, p) -> putStr (Char8.unpack $ B.toLazyByteString $ B.byteStringHex h) >> putStr " : " >> putStrLn p) hashes
   let doups = filterDuplicates hashes
+  time3 <- getCPUTime
   mapM_ (\(_, ps) -> mapM_ (\p -> putStr p >> putStr "\t") ps >> putStr "\n") $ HM.toList doups
+
+  putStr "Finding entries: "
+  print $ (time1 - time0)*100 `div` (time3 - time0)
+  putStr "Reading files and generating hashes: "
+  print $ (time2 - time1)*100 `div` (time3 - time0)
+  putStr "Filtering doup hashes: "
+  print $ (time3 - time2)*100 `div` (time3 - time0)
 
 filterDuplicates :: [(BS.ByteString, FilePath)] -> DupMap
 filterDuplicates = fd HM.empty
